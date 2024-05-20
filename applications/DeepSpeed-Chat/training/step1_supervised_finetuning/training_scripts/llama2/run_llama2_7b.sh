@@ -31,4 +31,5 @@ deepspeed main.py \
    --zero_stage $ZERO_STAGE \
    --deepspeed \
    --output_dir $OUTPUT \
+   --offload \
    &> $OUTPUT/training.log
