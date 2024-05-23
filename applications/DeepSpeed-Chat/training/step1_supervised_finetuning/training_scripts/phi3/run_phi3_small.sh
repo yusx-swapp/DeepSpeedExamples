@@ -17,8 +17,8 @@ deepspeed main.py \
    --data_path Dahoas/rm-static Dahoas/full-hh-rlhf Dahoas/synthetic-instruct-gptj-pairwise yitingxie/rlhf-reward-datasets \
    --data_split 2,4,4 \
    --model_name_or_path microsoft/Phi-3-small-8k-instruct \
-   --per_device_train_batch_size 4 \
-   --per_device_eval_batch_size 4 \
+   --per_device_train_batch_size 8 \
+   --per_device_eval_batch_size 8 \
    --max_seq_len 1024 \
    --learning_rate 9.65e-6 \
    --weight_decay 0. \
@@ -30,7 +30,6 @@ deepspeed main.py \
    --gradient_checkpointing \
    --zero_stage $ZERO_STAGE \
    --deepspeed \
-   --offload \
    --output_dir $OUTPUT \
    &> $OUTPUT/training.log
 
