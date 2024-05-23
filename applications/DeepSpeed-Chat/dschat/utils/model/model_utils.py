@@ -88,7 +88,8 @@ def create_hf_model(model_class,
                     ds_config=None,
                     rlhf_training=False,
                     dropout=None):
-    model_config = AutoConfig.from_pretrained(model_name_or_path)
+    model_config = AutoConfig.from_pretrained(
+        model_name_or_path, trust_remote_code=True)
     configure_dropout(model_config, dropout)
 
     # Note: dschf is defined in function scope to avoid global effects
