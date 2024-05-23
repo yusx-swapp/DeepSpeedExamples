@@ -105,7 +105,7 @@ def load_hf_tokenizer(model_name_or_path,
                                       fast_tokenizer=fast_tokenizer)
     else:
         tokenizer = get_tokenizer(model_name_or_path,
-                                  fast_tokenizer=fast_tokenizer)
+                                  fast_tokenizer=fast_tokenizer, trust_remote_code=True)
 
     if add_special_tokens is not None:
         add_special_tokens = [add_special_tokens] if isinstance(add_special_tokens, str) \
