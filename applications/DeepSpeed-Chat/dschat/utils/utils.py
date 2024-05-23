@@ -84,7 +84,7 @@ def get_tokenizer(model_name_or_path, fast_tokenizer=True):
             tokenizer.padding_side = 'right'
     else:
         tokenizer = AutoTokenizer.from_pretrained(
-            model_name_or_path, fast_tokenizer=fast_tokenizer)
+            model_name_or_path, fast_tokenizer=fast_tokenizer, trust_remote_code=True)
         tokenizer.pad_token = tokenizer.eos_token
         # make sure tokenizer is right pad in our logic
         tokenizer.padding_side = 'right'
@@ -105,7 +105,7 @@ def load_hf_tokenizer(model_name_or_path,
                                       fast_tokenizer=fast_tokenizer)
     else:
         tokenizer = get_tokenizer(model_name_or_path,
-                                  fast_tokenizer=fast_tokenizer, trust_remote_code=True)
+                                  fast_tokenizer=fast_tokenizer)
 
     if add_special_tokens is not None:
         add_special_tokens = [add_special_tokens] if isinstance(add_special_tokens, str) \
