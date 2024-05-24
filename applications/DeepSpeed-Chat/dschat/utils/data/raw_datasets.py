@@ -47,7 +47,38 @@ class PromptRawDataset(object):
         return
 
 
-# English dataset
+class AlpacaDataCleanedDataset(PromptRawDataset):
+    # English dataset
+    def __init__(self, output_path, seed, local_rank, dataset_name):
+        super().__init__(output_path, seed, local_rank, dataset_name)
+        self.dataset_name = "yahma/alpaca-cleaned"
+        self.dataset_name_clean = "yahma_alpaca_cleaned"
+        self.raw_datasets = self.raw_datasets.shuffle(self.seed)
+        self.raw_datasets = self.raw_datasets['train'].train_test_split(
+            test_size=0.3)
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        try:
+            return self.raw_datasets["test"]
+        except:
+            pass
+
+    def get_prompt(self, sample):
+        return " Human: " + sample['instruction'] + " Assistant:"
+
+    def get_chosen(self, sample):
+        pass
+
+    def get_rejected(self, sample):
+        pass
+
+    def get_prompt_and_chosen(self, sample):
+        return " Human: " + sample['instruction'] + " Assistant: " + sample['output']
+
+
 class DahoasRmstaticDataset(PromptRawDataset):
 
     def __init__(self, output_path, seed, local_rank, dataset_name):
