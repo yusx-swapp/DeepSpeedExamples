@@ -20,6 +20,11 @@ from deepspeed.accelerator import get_accelerator
 
 def get_raw_dataset(dataset_name, output_path, seed, local_rank):
 
+    if 'html-primary-identification':
+        return raw_datasets.HtmlPrimaryIdentificationDataset(output_path, seed,
+                                                             local_rank,
+                                                             dataset_name)
+
     if "yahma/alpaca-cleaned" in dataset_name:
         return raw_datasets.AlpacaDataCleanedDataset(output_path, seed,
                                                      local_rank, dataset_name)

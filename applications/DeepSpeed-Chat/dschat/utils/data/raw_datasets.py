@@ -47,6 +47,36 @@ class PromptRawDataset(object):
         return
 
 
+class HTMLPrimaryIdentificationDataset(PromptRawDataset):
+    # English dataset
+    def __init__(self, output_path, seed, local_rank, dataset_name):
+        super().__init__(output_path, seed, local_rank, dataset_name)
+        self.dataset_name = "html_primary_identification"
+        self.dataset_name_clean = "html_primary_identification"
+        self.raw_datasets = self.raw_datasets.shuffle(self.seed)
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        try:
+            return self.raw_datasets["test"]
+        except:
+            pass
+
+    def get_prompt(self, sample):
+        return " Human: " + sample['instruction'] + sample["input"]+" Assistant:"
+
+    def get_chosen(self, sample):
+        pass
+
+    def get_rejected(self, sample):
+        pass
+
+    def get_prompt_and_chosen(self, sample):
+        return " Human: " + sample['instruction'] + sample["input"]+" Assistant: " + sample['output']
+
+
 class AlpacaDataCleanedDataset(PromptRawDataset):
     # English dataset
     def __init__(self, output_path, seed, local_rank, dataset_name):
