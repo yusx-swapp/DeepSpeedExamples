@@ -5,7 +5,7 @@
 # DeepSpeed Team
 import argparse
 import math
-
+import mlflow
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
@@ -31,8 +31,7 @@ from dschat.utils.perf import print_throughput
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description=
-        "Finetune a transformers model on a causal language modeling task")
+        description="Finetune a transformers model on a causal language modeling task")
     parser.add_argument('--data_path',
                         nargs='*',
                         default=['Dahoas/rm-static'],
@@ -55,14 +54,12 @@ def parse_args():
         '--data_output_path',
         type=str,
         default='/tmp/data_files/',
-        help=
-        'Where to store the data-related files such as shuffle index. This needs to be on a local storage of a node (not on a shared storage)'
+        help='Where to store the data-related files such as shuffle index. This needs to be on a local storage of a node (not on a shared storage)'
     )
     parser.add_argument(
         "--model_name_or_path",
         type=str,
-        help=
-        "Path to pretrained model or model identifier from huggingface.co/models.",
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
         required=True,
     )
     parser.add_argument(
@@ -87,8 +84,7 @@ def parse_args():
         "--learning_rate",
         type=float,
         default=1e-3,
-        help=
-        "Initial learning rate (after the potential warmup period) to use.",
+        help="Initial learning rate (after the potential warmup period) to use.",
     )
     parser.add_argument("--weight_decay",
                         type=float,
@@ -102,8 +98,7 @@ def parse_args():
         "--gradient_accumulation_steps",
         type=int,
         default=1,
-        help=
-        "Number of updates steps to accumulate before performing a backward/update pass.",
+        help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument(
         "--lr_scheduler_type",
@@ -155,7 +150,7 @@ def parse_args():
         type=int,
         default=0,
         help='ZeRO optimization stage for Actor model (and clones).')
-    ## LoRA for efficient training setting
+    # LoRA for efficient training setting
     parser.add_argument("--lora_dim",
                         type=int,
                         default=0,
@@ -171,28 +166,27 @@ def parse_args():
         "--lora_learning_rate",
         type=float,
         default=5e-4,
-        help=
-        "Initial LoRA learning rate (after the potential warmup period) to use."
+        help="Initial LoRA learning rate (after the potential warmup period) to use."
     )
-    ## low precision
+    # low precision
     parser.add_argument(
         '--compute_fp32_loss',
         action='store_true',
         help='Relevant for low precision dtypes (fp16, bf16, etc.). '
         'If specified, loss is calculated in fp32.')
-    ## Tensorboard logging
+    # Tensorboard logging
     parser.add_argument('--enable_tensorboard',
                         action='store_true',
                         help='Enable tensorboard logging')
     parser.add_argument('--tensorboard_path',
                         type=str,
                         default="step1_tensorboard")
-    ## Tokenizer
+    # Tokenizer
     parser.add_argument(
         "--add_eot_token",
         action='store_true',
         help="Add <|endoftext|> as additional special token to tokenizer")
-    ## Print loss
+    # Print loss
     parser.add_argument('--print_loss',
                         action='store_true',
                         help='Prints loss at each step.')
@@ -226,7 +220,7 @@ def main():
         'train_micro_batch_size_per_gpu'] = args.per_device_train_batch_size
     ds_config[
         'train_batch_size'] = args.per_device_train_batch_size * torch.distributed.get_world_size(
-        ) * args.gradient_accumulation_steps
+    ) * args.gradient_accumulation_steps
 
     # If passed along, set the training seed now.
     set_random_seed(args.seed)
@@ -345,35 +339,39 @@ def main():
     perplexity, eval_loss = evaluation(model, eval_dataloader)
     print_rank_0(f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
 
-    for epoch in range(args.num_train_epochs):
-        print_rank_0(
-            f"Beginning of Epoch {epoch+1}/{args.num_train_epochs}, Total Micro Batches {len(train_dataloader)}",
-            args.global_rank)
-        model.train()
-        import time
-        for step, batch in enumerate(train_dataloader):
-            start = time.time()
-            batch = to_device(batch, device)
-            outputs = model(**batch, use_cache=False)
-            loss = outputs.loss
-            if args.print_loss:
-                print(
-                    f"Epoch: {epoch}, Step: {step}, Rank: {torch.distributed.get_rank()}, loss = {loss}"
-                )
-            model.backward(loss)
-            model.step()
-            end = time.time()
-            if torch.distributed.get_rank() == 0:
-                print_throughput(model.model, args, end - start,
-                                 args.global_rank)
+    mlflow.autolog()
 
-        # Evaluate perplexity on the validation set.
-        print_rank_0(
-            f"***** Evaluating perplexity, Epoch {epoch+1}/{args.num_train_epochs} *****",
-            args.global_rank)
-        perplexity, eval_loss = evaluation(model, eval_dataloader)
-        print_rank_0(f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
-        model.tput_timer.update_epoch_count()
+    with mlflow.start_run():
+        for epoch in range(args.num_train_epochs):
+            print_rank_0(
+                f"Beginning of Epoch {epoch+1}/{args.num_train_epochs}, Total Micro Batches {len(train_dataloader)}",
+                args.global_rank)
+            model.train()
+            import time
+            for step, batch in enumerate(train_dataloader):
+                start = time.time()
+                batch = to_device(batch, device)
+                outputs = model(**batch, use_cache=False)
+                loss = outputs.loss
+                if args.print_loss:
+                    print(
+                        f"Epoch: {epoch}, Step: {step}, Rank: {torch.distributed.get_rank()}, loss = {loss}"
+                    )
+                model.backward(loss)
+                model.step()
+                end = time.time()
+                if torch.distributed.get_rank() == 0:
+                    print_throughput(model.model, args, end - start,
+                                     args.global_rank)
+
+            # Evaluate perplexity on the validation set.
+            print_rank_0(
+                f"***** Evaluating perplexity, Epoch {epoch+1}/{args.num_train_epochs} *****",
+                args.global_rank)
+            perplexity, eval_loss = evaluation(model, eval_dataloader)
+            print_rank_0(
+                f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
+            model.tput_timer.update_epoch_count()
 
     if args.output_dir is not None:
         print_rank_0('saving the final model ...', args.global_rank)
