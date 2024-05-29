@@ -254,6 +254,8 @@ def main():
     set_random_seed(args.seed)
 
     torch.distributed.barrier()
+    if args.global_rank == 0 and args.enable_wandb:
+        wandb.init(project="htmlLLM")
 
     # load_hf_tokenizer will get the correct tokenizer and set padding tokens based on the model family
     args.end_of_conversation_token = "<|endoftext|>"
@@ -367,6 +369,9 @@ def main():
     perplexity, eval_loss = evaluation(model, eval_dataloader)
     print_rank_0(f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
 
+    if args.enable_wandb and args.global_rank == 0:
+        wandb.log({"ppl": perplexity})
+
     global_step = 0
     best_perplexity = perplexity
     for epoch in range(args.num_train_epochs):
@@ -419,7 +424,8 @@ def main():
         print_rank_0(
             f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
         model.tput_timer.update_epoch_count()
-
+        if args.enable_wandb and args.global_rank == 0:
+            wandb.log({"ppl": perplexity})
     save_model(model, tokenizer, args, type="final")
 
 
