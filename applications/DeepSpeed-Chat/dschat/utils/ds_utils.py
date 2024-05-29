@@ -74,7 +74,7 @@ def get_train_ds_config(offload,
         },
         "wandb": {
             "enabled": enable_wandb,
-            "project": "my_project"
+            "project": "htmlLLM"
         }
     }
 
