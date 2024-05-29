@@ -74,8 +74,6 @@ def get_train_ds_config(offload,
         },
         "wandb": {
             "enabled": enable_wandb,
-            "team": "my_team",
-            "group": "my_group",
             "project": "my_project"
         }
     }
