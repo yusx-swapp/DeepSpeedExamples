@@ -14,8 +14,7 @@ fi
 mkdir -p $OUTPUT
 
 deepspeed main.py \
-   --data_path html_primary_identification
-#    --sft_only_data_path yahma/alpaca-cleaned \
+   --data_path html_primary_identification \
    --data_split 1,0,0 \
    --model_name_or_path microsoft/Phi-3-small-8k-instruct \
    --per_device_train_batch_size 2 \
