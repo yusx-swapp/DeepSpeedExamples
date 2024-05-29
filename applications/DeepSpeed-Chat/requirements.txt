@@ -8,5 +8,4 @@ transformers>=4.31.0,!=4.33.2
 tensorboard
 tiktoken
 einops
-flash-attn
 wandb
