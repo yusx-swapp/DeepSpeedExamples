@@ -11,7 +11,11 @@ fi
 if [ "$ZERO_STAGE" == "" ]; then
     ZERO_STAGE=3
 fi
+
+
 mkdir -p $OUTPUT
+
+wandb login $WANDB_API_KEY
 
 deepspeed main.py \
    --data_path html_primary_identification \
