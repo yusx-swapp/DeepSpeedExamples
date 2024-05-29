@@ -5,10 +5,11 @@
 # DeepSpeed Team
 import argparse
 import math
+import os
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
-
+import wandb
 from transformers import (
     AutoModelForCausalLM,
     SchedulerType,
@@ -118,6 +119,10 @@ def parse_args():
                         type=str,
                         default=None,
                         help="Where to store the model.")
+    parser.add_argument("--logging_steps",
+                        type=int,
+                        default=200,
+                        help="Log every X updates steps.")
     parser.add_argument("--seed",
                         type=int,
                         default=1234,
@@ -198,6 +203,24 @@ def parse_args():
     args = parser.parse_args()
 
     return args
+
+
+def save_model(model, tokenizer, args, type="latest"):
+    if args.output_dir is None:
+        return
+    print_rank_0(f'saving the {type} model ...', args.global_rank)
+    model = convert_lora_to_linear_layer(model)
+
+    if args.global_rank == 0:
+        save_hf_format(model, tokenizer, args, sub_folder=type)
+
+    if args.zero_stage == 3:
+        output_dir = os.path.join(args.output_dir, type)
+        # For zero stage 3, each gpu only has a part of the model, so we need a special save function
+        save_zero_three_model(model,
+                              args.global_rank,
+                              output_dir,
+                              zero_stage=args.zero_stage)
 
 
 def main():
@@ -344,6 +367,8 @@ def main():
     perplexity, eval_loss = evaluation(model, eval_dataloader)
     print_rank_0(f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
 
+    global_step = 0
+    best_perplexity = perplexity
     for epoch in range(args.num_train_epochs):
         print_rank_0(
             f"Beginning of Epoch {epoch+1}/{args.num_train_epochs}, Total Micro Batches {len(train_dataloader)}",
@@ -366,6 +391,26 @@ def main():
                 print_throughput(model.model, args, end - start,
                                  args.global_rank)
 
+            # logging
+            global_step += 1
+
+            if global_step % args.logging_steps == 0:
+                perplexity, eval_loss = evaluation(model, eval_dataloader)
+
+                if perplexity < best_perplexity:
+                    best_perplexity = perplexity
+
+                    save_model(model, tokenizer, args, type="best")
+
+                print_rank_0(
+                    f"training step:{global_step}, ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
+
+                if args.enable_wandb and args.global_rank == 0:
+                    wandb.log({"ppl": perplexity})
+
+            # save latest model
+            save_model(model, tokenizer, args, type="latest")
+
         # Evaluate perplexity on the validation set.
         print_rank_0(
             f"***** Evaluating perplexity, Epoch {epoch+1}/{args.num_train_epochs} *****",
@@ -375,19 +420,7 @@ def main():
             f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
         model.tput_timer.update_epoch_count()
 
-    if args.output_dir is not None:
-        print_rank_0('saving the final model ...', args.global_rank)
-        model = convert_lora_to_linear_layer(model)
-
-        if args.global_rank == 0:
-            save_hf_format(model, tokenizer, args)
-
-        if args.zero_stage == 3:
-            # For zero stage 3, each gpu only has a part of the model, so we need a special save function
-            save_zero_three_model(model,
-                                  args.global_rank,
-                                  args.output_dir,
-                                  zero_stage=args.zero_stage)
+    save_model(model, tokenizer, args, type="final")
 
 
 if __name__ == "__main__":
