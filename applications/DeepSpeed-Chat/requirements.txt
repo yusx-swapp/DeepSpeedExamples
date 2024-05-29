@@ -10,3 +10,4 @@ tiktoken
 einops
 flash-attn
 mlflow
+wandb
