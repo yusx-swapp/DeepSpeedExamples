@@ -6,7 +6,7 @@
 OUTPUT=$1
 ZERO_STAGE=$2
 if [ "$OUTPUT" == "" ]; then
-    OUTPUT=./output_step1_phi3_7b
+    OUTPUT=./output_step1_phi3_7b_1
 fi
 if [ "$ZERO_STAGE" == "" ]; then
     ZERO_STAGE=3

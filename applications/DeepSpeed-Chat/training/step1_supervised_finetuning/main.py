@@ -87,7 +87,7 @@ def parse_args():
     )
     parser.add_argument("--weight_decay",
                         type=float,
-                        default=0.,
+                        default=0.01,
                         help="Weight decay to use.")
     parser.add_argument("--num_train_epochs",
                         type=int,
