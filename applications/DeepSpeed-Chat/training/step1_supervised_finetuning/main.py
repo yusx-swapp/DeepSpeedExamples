@@ -5,7 +5,6 @@
 # DeepSpeed Team
 import argparse
 import math
-import mlflow
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
@@ -178,6 +177,11 @@ def parse_args():
     parser.add_argument('--enable_tensorboard',
                         action='store_true',
                         help='Enable tensorboard logging')
+
+    parser.add_argument('--enable_wandb',
+                        action='store_true',
+                        help='Enable wandb logging')
+
     parser.add_argument('--tensorboard_path',
                         type=str,
                         default="step1_tensorboard")
@@ -214,6 +218,7 @@ def main():
                                     dtype=args.dtype,
                                     stage=args.zero_stage,
                                     enable_tensorboard=args.enable_tensorboard,
+                                    enable_wandb=args.enable_tensorboard,
                                     tb_path=args.tensorboard_path,
                                     tb_name="step1_model")
     ds_config[
@@ -339,39 +344,36 @@ def main():
     perplexity, eval_loss = evaluation(model, eval_dataloader)
     print_rank_0(f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
 
-    mlflow.autolog()
+    for epoch in range(args.num_train_epochs):
+        print_rank_0(
+            f"Beginning of Epoch {epoch+1}/{args.num_train_epochs}, Total Micro Batches {len(train_dataloader)}",
+            args.global_rank)
+        model.train()
+        import time
+        for step, batch in enumerate(train_dataloader):
+            start = time.time()
+            batch = to_device(batch, device)
+            outputs = model(**batch, use_cache=False)
+            loss = outputs.loss
+            if args.print_loss:
+                print(
+                    f"Epoch: {epoch}, Step: {step}, Rank: {torch.distributed.get_rank()}, loss = {loss}"
+                )
+            model.backward(loss)
+            model.step()
+            end = time.time()
+            if torch.distributed.get_rank() == 0:
+                print_throughput(model.model, args, end - start,
+                                 args.global_rank)
 
-    with mlflow.start_run():
-        for epoch in range(args.num_train_epochs):
-            print_rank_0(
-                f"Beginning of Epoch {epoch+1}/{args.num_train_epochs}, Total Micro Batches {len(train_dataloader)}",
-                args.global_rank)
-            model.train()
-            import time
-            for step, batch in enumerate(train_dataloader):
-                start = time.time()
-                batch = to_device(batch, device)
-                outputs = model(**batch, use_cache=False)
-                loss = outputs.loss
-                if args.print_loss:
-                    print(
-                        f"Epoch: {epoch}, Step: {step}, Rank: {torch.distributed.get_rank()}, loss = {loss}"
-                    )
-                model.backward(loss)
-                model.step()
-                end = time.time()
-                if torch.distributed.get_rank() == 0:
-                    print_throughput(model.model, args, end - start,
-                                     args.global_rank)
-
-            # Evaluate perplexity on the validation set.
-            print_rank_0(
-                f"***** Evaluating perplexity, Epoch {epoch+1}/{args.num_train_epochs} *****",
-                args.global_rank)
-            perplexity, eval_loss = evaluation(model, eval_dataloader)
-            print_rank_0(
-                f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
-            model.tput_timer.update_epoch_count()
+        # Evaluate perplexity on the validation set.
+        print_rank_0(
+            f"***** Evaluating perplexity, Epoch {epoch+1}/{args.num_train_epochs} *****",
+            args.global_rank)
+        perplexity, eval_loss = evaluation(model, eval_dataloader)
+        print_rank_0(
+            f"ppl: {perplexity}, loss: {eval_loss}", args.global_rank)
+        model.tput_timer.update_epoch_count()
 
     if args.output_dir is not None:
         print_rank_0('saving the final model ...', args.global_rank)

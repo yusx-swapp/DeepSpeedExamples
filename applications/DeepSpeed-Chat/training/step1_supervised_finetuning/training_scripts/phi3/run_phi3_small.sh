@@ -31,6 +31,8 @@ deepspeed main.py \
    --zero_stage $ZERO_STAGE \
    --deepspeed \
    --output_dir $OUTPUT \
+   --enable_wandb \
+   --enable_tensorboard \
    &> $OUTPUT/training.log
 
 #    --model_name_or_path meta-llama/Llama-2-7b-hf \
