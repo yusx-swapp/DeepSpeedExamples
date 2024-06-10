@@ -1,8 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: Apache-2.0
 
+
 import os
-# DeepSpeed Team
 from datasets import load_dataset, load_from_disk
 from torch.utils.data import Subset
 import re
@@ -47,12 +47,44 @@ class PromptRawDataset(object):
         return
 
 
+class HTMLPrimaryIdentificationDatasetWithID(PromptRawDataset):
+    # English dataset
+    def __init__(self, output_path, seed, local_rank, dataset_name):
+        super().__init__(output_path, seed, local_rank, dataset_name)
+        self.dataset_name = dataset_name.split("/")[-1]
+        self.dataset_name_clean = dataset_name.split("/")[-1]
+        self.raw_datasets = self.raw_datasets.shuffle(self.seed)
+
+    def get_train_data(self):
+        return self.raw_datasets["train"]
+
+    def get_eval_data(self):
+        try:
+            return self.raw_datasets["test"]
+        except:
+            pass
+
+    def get_prompt(self, sample):
+        return " Human: " + sample['instruction'] + sample["input"]+" Assistant:"
+
+    def get_chosen(self, sample):
+        pass
+
+    def get_rejected(self, sample):
+        pass
+
+    def get_prompt_and_chosen(self, sample):
+        if (sample['primary_labels'] == []) or (sample['primary_labels'] == "") or (sample['primary_labels'] == None):
+            return " Human: " + sample['instruction'] + sample["input"]+" Assistant: There is no primary text node label in this HTML document."
+        return " Human: " + sample['instruction'] + sample["input"]+" Assistant: the primary text node labels are:" + str(sample["primary_labels"])
+
+
 class HTMLPrimaryIdentificationDataset(PromptRawDataset):
     # English dataset
     def __init__(self, output_path, seed, local_rank, dataset_name):
         super().__init__(output_path, seed, local_rank, dataset_name)
-        self.dataset_name = "html_primary_identification"
-        self.dataset_name_clean = "html_primary_identification"
+        self.dataset_name = dataset_name.split("/")[-1]
+        self.dataset_name_clean = dataset_name.split("/")[-1]
         self.raw_datasets = self.raw_datasets.shuffle(self.seed)
 
     def get_train_data(self):
